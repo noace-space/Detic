@@ -8,7 +8,6 @@ import time
 # import some common detectron2 utilities
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
-from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 
 # Detic libraries
@@ -17,6 +16,9 @@ from centernet.config import add_centernet_config
 from detic.config import add_detic_config
 from detic.modeling.utils import reset_cls_test
 from detic.modeling.text.text_encoder import build_text_encoder
+
+class Output(cog.BaseModel):
+    jsona: Path
 
 class Predictor(cog.Predictor):
     def setup(self):
@@ -82,11 +84,33 @@ class Predictor(cog.Predictor):
                 self.predictor.model.roi_heads.box_predictor[cascade_stages].test_score_thresh = output_score_threshold
 
         outputs = self.predictor(image)
-        v = Visualizer(image[:, :, ::-1], metadata)
-        out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        out_path = Path(tempfile.mkdtemp()) / "out.png"
-        cv2.imwrite(str(out_path), out.get_image()[:, :, ::-1])
-        return out_path
+
+        pred_classes = outputs["instances"].pred_classes.cpu().tolist()
+        class_names = [metadata.thing_classes[x] for x in pred_classes]
+        scores = outputs["instances"].scores.cpu().tolist()
+        pred_boxes = outputs["instances"].pred_boxes.tensor.cpu().tolist()
+        pred_masks = outputs["instances"].pred_masks.tensor.cpu().tolist()
+
+        # Create a dictionary to store the information
+        output_dict = {
+            "pred_classes": pred_classes,
+            "class_names": class_names,
+            "scores": scores,
+            "pred_boxes": pred_boxes,
+            "pred_masks": pred_masks
+        }
+
+        # Convert the dictionary to JSON
+        json_output = json.dumps(output_dict, indent=2)
+
+        # Specify the file path
+        output_file_path = Path(tempfile.mkdtemp()) / "output.json"
+        
+        # Write the JSON data to the file
+        with open(output_file_path, "w") as output_file:
+            output_file.write(json_output)
+
+        return Output(jsona=output_file_path)
 
 
 def get_clip_embeddings(vocabulary, prompt='a '):
