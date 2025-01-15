@@ -20,7 +20,7 @@ from detic.modeling.text.text_encoder import build_text_encoder
 class Output(cog.BaseModel):
     jsona: Path
 
-class Predictor(cog.Predictor):
+class Predictor(cog.BasePredictor):
     def setup(self):
         cfg = get_cfg()
         add_centernet_config(cfg)
@@ -44,25 +44,7 @@ class Predictor(cog.Predictor):
             'coco': 'coco_2017_val',
         }
 
-    @cog.input(
-        "image",
-        type=Path,
-        help="input image",
-    )
-    @cog.input(
-        "vocabulary",
-        type=str,
-        default='lvis',
-        options=['lvis', 'objects365', 'openimages', 'coco', 'custom'],
-        help="Choose vocabulary",
-    )
-    @cog.input(
-        "custom_vocabulary",
-        type=str,
-        default=None,
-        help="Type your own vocabularies, separated by coma ','",
-    )
-    def predict(self, image, vocabulary, custom_vocabulary):
+    def predict(self, image: cog.Path, vocabulary:str=cog.Input(description="Choose vocabulary", default='lvis', choices=['lvis', 'objects365', 'openimages', 'coco', 'custom']), custom_vocabulary:str=cog.Input(description="Choose vocabulary")) -> Output:
         image = cv2.imread(str(image))
         if not vocabulary == 'custom':
             metadata = MetadataCatalog.get(self.BUILDIN_METADATA_PATH[vocabulary])
